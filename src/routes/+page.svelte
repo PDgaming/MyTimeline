@@ -12,6 +12,7 @@
 	import type { event } from '$lib/types';
 	import AddEvent from '$lib/components/addEvent.svelte';
 	import EventTooltip from '$lib/components/event.svelte';
+	import Sidebar from '$lib/components/sidebar.svelte';
 
 	// --- Component State ---
 	let isDragging = $state(false);
@@ -224,80 +225,82 @@
 	}
 </script>
 
-<div class="flex h-screen flex-col gap-4 bg-gray-100 p-4 font-sans">
+<div class="flex h-screen flex-col gap-3 bg-gray-100 font-sans">
 	<div class="title">
-		<h1 class="w-full text-center text-4xl font-bold text-gray-800">Svelte Interactive Timeline</h1>
+		<h1 class="w-full text-center text-4xl font-bold text-gray-800">MyTimeline</h1>
 	</div>
 
 	<AddEvent />
-
-	<div class="timeline flex h-full flex-col gap-1 rounded-lg bg-gray-300 p-2 shadow-inner">
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			class="timeline-container relative h-full rounded-md bg-white shadow-md"
-			onmousedown={onMouseDown}
-			onwheel={onWheel}
-		>
-			<div class="header-label">{headerLabel}</div>
-
-			<div class="timeline-axis"></div>
-
-			<div class="timeline-markers-container">
-				{#each timelineMarkers as marker}
-					<div
-						class="marker-wrapper"
-						style="left: {((marker.time - visibleStart.value) /
-							(visibleEnd.value - visibleStart.value)) *
-							100}%"
-					>
-						<div class="timeline-marker" class:large={marker.type === 'large'}></div>
-						{#if marker.label}
-							<div
-								class="timeline-label"
-								class:top={marker.position === 'top'}
-								class:bottom={marker.position === 'bottom'}
-							>
-								{marker.label}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-
-			<div class="timeline-events-container">
-				{#each events.value as event (event.id)}
-					<div
-						class="timeline-event"
-						style="left: {((event.date - visibleStart.value) /
-							(visibleEnd.value - visibleStart.value)) *
-							100}%"
-					>
-						<div
-							class="event-pin"
-							title="{event.title} - {new Date(event.date).toLocaleDateString()}"
-							onmouseenter={(e) => showTooltip(e, event)}
-							onmousemove={(e) => {
-								tooltipX = e.clientX;
-								tooltipY = e.clientY;
-							}}
-							onmouseleave={hideTooltip}
-						></div>
-					</div>
-				{/each}
-			</div>
-
-			<div class="zoom-indicator">
-				Zoom: {displayZoom}%
-			</div>
-		</div>
-		{#if hoveredEvent}
+	<div class="main-content flex h-full flex-row gap-2 rounded-md bg-gray-300 p-2">
+		<Sidebar />
+		<div class="timeline flex flex-1 flex-col gap-1 rounded-lg bg-gray-300 shadow-inner">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				style="position: fixed; left: {tooltipX + 12}px; top: {tooltipY -
-					12}px; pointer-events: none; z-index: 1000;"
+				class="timeline-container relative h-full rounded-md bg-white shadow-md"
+				onmousedown={onMouseDown}
+				onwheel={onWheel}
 			>
-				<EventTooltip thisEvent={hoveredEvent} />
+				<div class="header-label">{headerLabel}</div>
+
+				<div class="timeline-axis"></div>
+
+				<div class="timeline-markers-container">
+					{#each timelineMarkers as marker}
+						<div
+							class="marker-wrapper"
+							style="left: {((marker.time - visibleStart.value) /
+								(visibleEnd.value - visibleStart.value)) *
+								100}%"
+						>
+							<div class="timeline-marker" class:large={marker.type === 'large'}></div>
+							{#if marker.label}
+								<div
+									class="timeline-label"
+									class:top={marker.position === 'top'}
+									class:bottom={marker.position === 'bottom'}
+								>
+									{marker.label}
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
+
+				<div class="timeline-events-container">
+					{#each events.value as event (event.id)}
+						<div
+							class="timeline-event"
+							style="left: {((event.date - visibleStart.value) /
+								(visibleEnd.value - visibleStart.value)) *
+								100}%"
+						>
+							<div
+								class="event-pin"
+								title="{event.title} - {new Date(event.date).toLocaleDateString()}"
+								onmouseenter={(e) => showTooltip(e, event)}
+								onmousemove={(e) => {
+									tooltipX = e.clientX;
+									tooltipY = e.clientY;
+								}}
+								onmouseleave={hideTooltip}
+							></div>
+						</div>
+					{/each}
+				</div>
+
+				<div class="zoom-indicator">
+					Zoom: {displayZoom}%
+				</div>
 			</div>
-		{/if}
+			{#if hoveredEvent}
+				<div
+					style="position: fixed; left: {tooltipX + 12}px; top: {tooltipY -
+						12}px; pointer-events: none; z-index: 1000;"
+				>
+					<EventTooltip thisEvent={hoveredEvent} />
+				</div>
+			{/if}
+		</div>
 	</div>
 </div>
 
@@ -345,7 +348,6 @@
 		position: absolute;
 		width: 100%;
 		height: 100%;
-		pointer-events: none;
 	}
 
 	.marker-wrapper {
@@ -428,5 +430,12 @@
 		font-size: 0.75rem;
 		font-weight: 500;
 		pointer-events: none;
+	}
+	.main-content {
+		align-items: flex-start;
+		height: 100%;
+	}
+	.timeline {
+		height: 100%;
 	}
 </style>

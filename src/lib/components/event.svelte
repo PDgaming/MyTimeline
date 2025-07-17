@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { event } from '$lib/types';
+	import { events } from '$lib/stores/store.svelte';
 	export let thisEvent: event;
 </script>
 

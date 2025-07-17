@@ -15,13 +15,18 @@
 			date: new Date(newDate).getTime()
 		};
 		events.value = [...events.value, newEvent];
+		// Save to localStorage
+		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
 		newTitle = '';
 		newDescription = '';
 		newDate = '';
 	}
 </script>
 
-<form class="add-event-form" on:submit|preventDefault={addEvent}>
+<form
+	class="add-event-form flex flex-wrap rounded-md bg-gray-300 p-2 shadow-xl"
+	on:submit|preventDefault={addEvent}
+>
 	<input type="text" placeholder="Title" bind:value={newTitle} required />
 	<input type="date" bind:value={newDate} required />
 	<input type="text" placeholder="Description" bind:value={newDescription} />
@@ -32,7 +37,6 @@
 	.add-event-form {
 		display: flex;
 		gap: 0.5rem;
-		margin-bottom: 1rem;
 	}
 	.add-event-form input,
 	.add-event-form button {
