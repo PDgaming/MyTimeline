@@ -27,10 +27,10 @@
 	class="add-event-form flex flex-wrap rounded-md bg-gray-300 p-2 shadow-xl"
 	on:submit|preventDefault={addEvent}
 >
-	<input type="text" placeholder="Title" bind:value={newTitle} required />
-	<input type="date" bind:value={newDate} required />
-	<input type="text" placeholder="Description" bind:value={newDescription} />
-	<button type="submit">Add Event</button>
+	<input class="rounded-md" type="text" placeholder="Title" bind:value={newTitle} required />
+	<input class="rounded-md" type="date" bind:value={newDate} required />
+	<input class="rounded-md" type="text" placeholder="Description" bind:value={newDescription} />
+	<button class="btn" type="submit">Add Event</button>
 </form>
 
 <style>
@@ -41,7 +41,6 @@
 	.add-event-form input,
 	.add-event-form button {
 		padding: 0.5rem;
-		border-radius: 4px;
 		border: 1px solid #cbd5e1;
 		font-size: 1rem;
 	}

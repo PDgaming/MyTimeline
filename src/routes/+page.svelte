@@ -14,6 +14,8 @@
 	import EventTooltip from '$lib/components/event.svelte';
 	import Sidebar from '$lib/components/sidebar.svelte';
 
+	const TIMELINE_PADDING = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+
 	// --- Component State ---
 	let isDragging = $state(false);
 	let dragStartX = 0;
@@ -23,8 +25,14 @@
 	>([]);
 	let headerLabel = $state(''); // For the new hierarchical label
 	let hoveredEvent: event | null = $state(null);
+	let hoveredEventId: string | null = $state(null);
 	let tooltipX = $state(0);
 	let tooltipY = $state(0);
+
+	// --- Event Drag State ---
+	let draggingEventId: string | null = null;
+	let dragEventStartX = 0;
+	let dragEventStartDate = 0;
 
 	// --- Derived State for UI ---
 	let displayZoom = $derived.by(() => {
@@ -78,8 +86,8 @@
 			newStart = timelineMin;
 			newEnd = newStart + timeSpan;
 		}
-		if (newEnd > timelineMax) {
-			newEnd = timelineMax;
+		if (newEnd > timelineMax + TIMELINE_PADDING) {
+			newEnd = timelineMax + TIMELINE_PADDING;
 			newStart = newEnd - timeSpan;
 		}
 
@@ -114,8 +122,8 @@
 		if (newStart < timelineMin) {
 			newStart = timelineMin;
 		}
-		if (newEnd > timelineMax) {
-			newEnd = timelineMax;
+		if (newEnd > timelineMax + TIMELINE_PADDING) {
+			newEnd = timelineMax + TIMELINE_PADDING;
 		}
 
 		visibleStart.value = newStart;
@@ -125,71 +133,97 @@
 	// --- Marker and Label Calculation Logic ---
 	$effect(() => {
 		const span = visibleEnd.value - visibleStart.value;
-		const newMarkers: {
-			time: number;
-			type: 'large' | 'small';
-			label: string;
-			position: 'top' | 'bottom';
-		}[] = [];
+		const newMarkers = [];
+		const DAY = 24 * 60 * 60 * 1000;
+		const YEAR = 365.25 * DAY;
+
 		const startDate = new Date(visibleStart.value);
 		const endDate = new Date(visibleEnd.value);
 		const centerDate = new Date(visibleStart.value + span / 2);
-		const DAY = 24 * 60 * 60 * 1000;
-		const YEAR = 365.25 * DAY;
 
 		// Level 1: Decade / Year markers
 		if (span > 15 * YEAR) {
 			headerLabel = `${Math.floor(centerDate.getFullYear() / 10) * 10}s`;
-			const startYear = startDate.getFullYear();
+
+			// Find the first year >= visibleStart
+			let year = startDate.getFullYear();
+			if (new Date(year, 0, 1).getTime() < visibleStart.value) year++;
 			const endYear = endDate.getFullYear();
-			for (let year = startYear; year <= endYear; year++) {
+
+			for (; year <= endYear; year++) {
 				const time = new Date(year, 0, 1).getTime();
-				if (time < visibleStart.value || time > visibleEnd.value) continue;
 				if (year % 10 === 0) {
-					newMarkers.push({ time, type: 'large', label: year.toString(), position: 'top' });
+					newMarkers.push({
+						time,
+						type: 'large' as const,
+						label: year.toString(),
+						position: 'top' as const
+					});
 				} else {
-					newMarkers.push({ time, type: 'small', label: year.toString(), position: 'bottom' });
+					newMarkers.push({
+						time,
+						type: 'small' as const,
+						label: year.toString(),
+						position: 'bottom' as const
+					});
 				}
 			}
 		}
 		// Level 2: Year / Month markers
 		else if (span > 1.5 * YEAR) {
 			headerLabel = centerDate.getFullYear().toString();
-			for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
-				for (let month = 0; month < 12; month++) {
-					const date = new Date(year, month, 1);
-					const time = date.getTime();
-					if (time > visibleEnd.value) break;
-					if (time < visibleStart.value) continue;
 
-					if (month === 0) {
-						newMarkers.push({ time, type: 'large', label: year.toString(), position: 'top' });
-					} else {
-						const monthName = date.toLocaleString('default', { month: 'short' });
-						newMarkers.push({ time, type: 'small', label: monthName, position: 'bottom' });
-					}
+			let year = startDate.getFullYear();
+			let month = startDate.getMonth();
+			let date = new Date(year, month, 1);
+			// Move to the first visible month
+			while (date.getTime() < visibleStart.value) {
+				month++;
+				if (month > 11) {
+					month = 0;
+					year++;
 				}
+				date = new Date(year, month, 1);
+			}
+			while (date.getTime() <= visibleEnd.value) {
+				const time = date.getTime();
+				if (month === 0) {
+					newMarkers.push({ time, type: 'large', label: year.toString(), position: 'top' });
+				} else {
+					const monthName = date.toLocaleString('default', { month: 'short' });
+					newMarkers.push({ time, type: 'small', label: monthName, position: 'bottom' });
+				}
+				month++;
+				if (month > 11) {
+					month = 0;
+					year++;
+				}
+				date = new Date(year, month, 1);
 			}
 		}
 		// Level 3: Month / Day markers
 		else if (span > 3 * DAY) {
 			headerLabel = centerDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
 			let current = new Date(startDate);
 			current.setHours(0, 0, 0, 0);
+			// Move to the first visible day
+			if (current.getTime() < visibleStart.value) {
+				current = new Date(visibleStart.value);
+				current.setHours(0, 0, 0, 0);
+			}
 			while (current.getTime() <= visibleEnd.value) {
 				const time = current.getTime();
-				if (time >= visibleStart.value) {
-					if (current.getDate() === 1) {
-						const label = current.toLocaleString('default', { month: 'long' });
-						newMarkers.push({ time, type: 'large', label, position: 'top' });
-					} else if (span < 45 * DAY) {
-						newMarkers.push({
-							time,
-							type: 'small',
-							label: current.getDate().toString(),
-							position: 'bottom'
-						});
-					}
+				if (current.getDate() === 1) {
+					const label = current.toLocaleString('default', { month: 'short' });
+					newMarkers.push({ time, type: 'large', label, position: 'top' });
+				} else if (span < 45 * DAY) {
+					newMarkers.push({
+						time,
+						type: 'small',
+						label: current.getDate().toString(),
+						position: 'bottom'
+					});
 				}
 				current.setDate(current.getDate() + 1);
 			}
@@ -197,31 +231,75 @@
 		// Level 4: Day / Hour markers
 		else {
 			headerLabel = centerDate.toLocaleString('default', { dateStyle: 'full' });
+
 			let current = new Date(startDate);
 			current.setMinutes(0, 0, 0);
+			// Move to the first visible hour
+			if (current.getTime() < visibleStart.value) {
+				current = new Date(visibleStart.value);
+				current.setMinutes(0, 0, 0);
+			}
 			while (current.getTime() <= visibleEnd.value) {
 				const time = current.getTime();
-				if (time >= visibleStart.value) {
-					if (current.getHours() % 6 === 0) {
-						const label = current.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-						newMarkers.push({ time, type: 'large', label, position: 'top' });
-					} else {
-						newMarkers.push({ time, type: 'small', label: '', position: 'bottom' });
-					}
+				if (current.getHours() % 6 === 0) {
+					const label = current.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+					newMarkers.push({ time, type: 'large', label, position: 'top' });
+				} else {
+					newMarkers.push({ time, type: 'small', label: '', position: 'bottom' });
 				}
 				current.setHours(current.getHours() + 1);
 			}
 		}
+		// @ts-expect-error
 		timelineMarkers = newMarkers;
 	});
 
 	function showTooltip(e: MouseEvent, ev: event) {
+		hoveredEventId = ev.id;
 		hoveredEvent = ev;
 		tooltipX = e.clientX;
 		tooltipY = e.clientY;
 	}
 	function hideTooltip() {
+		hoveredEventId = null;
 		hoveredEvent = null;
+	}
+
+	function onEventMouseDown(e: MouseEvent, ev: event) {
+		e.stopPropagation(); // Prevent timeline pan
+		draggingEventId = ev.id;
+		dragEventStartX = e.clientX;
+		dragEventStartDate = ev.date;
+		window.addEventListener('mousemove', onEventMouseMove);
+		window.addEventListener('mouseup', onEventMouseUp);
+	}
+
+	function onEventMouseMove(e: MouseEvent) {
+		if (!draggingEventId) return;
+		const dx = e.clientX - dragEventStartX;
+		const timelineElem = document.querySelector('.timeline-container') as HTMLElement;
+		if (!timelineElem) return;
+		const rect = timelineElem.getBoundingClientRect();
+		const timelineWidth = rect.width;
+		const timeSpan = visibleEnd.value - visibleStart.value;
+		const msPerPixel = timeSpan / timelineWidth;
+		const msShift = dx * msPerPixel;
+		const newDate = Math.round(dragEventStartDate + msShift);
+		// Clamp to timeline min/max
+		const clampedDate = Math.max(timelineMin, Math.min(timelineMax, newDate));
+		// Update event visually (optimistic update)
+		events.value = events.value.map((ev) =>
+			ev.id === draggingEventId ? { ...ev, date: clampedDate } : ev
+		);
+	}
+
+	function onEventMouseUp() {
+		if (!draggingEventId) return;
+		// Persist to localStorage
+		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+		draggingEventId = null;
+		window.removeEventListener('mousemove', onEventMouseMove);
+		window.removeEventListener('mouseup', onEventMouseUp);
 	}
 </script>
 
@@ -283,6 +361,7 @@
 									tooltipY = e.clientY;
 								}}
 								onmouseleave={hideTooltip}
+								onmousedown={(e) => onEventMouseDown(e, event)}
 							></div>
 						</div>
 					{/each}
@@ -292,14 +371,35 @@
 					Zoom: {displayZoom}%
 				</div>
 			</div>
-			{#if hoveredEvent}
-				<div
-					style="position: fixed; left: {tooltipX + 12}px; top: {tooltipY -
-						12}px; pointer-events: none; z-index: 1000;"
-				>
-					<EventTooltip thisEvent={hoveredEvent} />
-				</div>
+			{#if hoveredEventId}
+				{#each events.value as ev (ev.id)}
+					{#if ev.id === hoveredEventId}
+						<div
+							style="position: fixed; left: {tooltipX + 12}px; top: {tooltipY -
+								12}px; pointer-events: none; z-index: 1000;"
+						>
+							<EventTooltip thisEvent={ev} />
+						</div>
+					{/if}
+				{/each}
 			{/if}
+			<!-- <div
+				style="
+					position: absolute;
+					top: 10px;
+					right: 10px;
+					background: rgba(0,0,0,0.5);
+					color: white;
+					padding: 4px 8px;
+					border-radius: 6px;
+					font-size: 0.8rem;
+					z-index: 1001;
+					pointer-events: none;
+				"
+			>
+				Markers: {timelineMarkers.length}<br />
+				Labels: {timelineMarkers.filter((m) => m.label).length}
+			</div> -->
 		</div>
 	</div>
 </div>
@@ -369,7 +469,7 @@
 	.timeline-marker.large {
 		width: 2px;
 		height: 100%;
-		max-height: 40px;
+		max-height: 30px;
 		background-color: #475569; /* gray-600 */
 	}
 
@@ -377,7 +477,7 @@
 		position: absolute;
 		font-size: 0.75rem;
 		color: #334155; /* gray-700 */
-		background: rgba(241, 245, 249, 0.85);
+		background: rgba(227, 230, 233, 0.85);
 		backdrop-filter: blur(2px);
 		padding: 2px 6px;
 		border-radius: 4px;
@@ -386,11 +486,11 @@
 	}
 	.timeline-label.top {
 		bottom: 50%;
-		transform: translateY(-22px);
+		transform: translateY(-15px);
 	}
 	.timeline-label.bottom {
 		top: 50%;
-		transform: translateY(22px);
+		transform: translateY(20px);
 	}
 
 	.timeline-event {

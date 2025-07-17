@@ -61,10 +61,10 @@ Events are objects with the following structure:
 
 ```ts
 type event = {
-	id: string;
-	title: string;
-	description: string;
-	date: number; // Unix timestamp (ms)
+id: string;
+title: string;
+description: string;
+date: number; // Unix timestamp (ms)
 };
 ```
 
