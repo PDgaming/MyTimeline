@@ -4,6 +4,8 @@
 
 	let editingEventId: string | null = null;
 	let editingDate: string = '';
+	let editingTitleId: string | null = null;
+	let editingTitle: string = '';
 
 	function deleteEvent(id: string) {
 		events.value = events.value.filter((ev) => ev.id !== id);
@@ -36,34 +38,68 @@
 			editingEventId = null;
 		}
 	}
+
+	function startEditTitle(ev: event) {
+		editingTitleId = ev.id;
+		editingTitle = ev.title;
+	}
+
+	function saveEditTitle(ev: event) {
+		if (!editingTitle) return;
+		events.value = events.value.map((e) => (e.id === ev.id ? { ...e, title: editingTitle } : e));
+		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+		editingTitleId = null;
+	}
+
+	function handleTitleInputKey(e: KeyboardEvent, ev: event) {
+		if (e.key === 'Enter') {
+			saveEditTitle(ev);
+		}
+		if (e.key === 'Escape') {
+			editingTitleId = null;
+		}
+	}
 </script>
 
-<aside class="sidebar h-full">
-	<h2>All Events</h2>
+<aside class="sidebar flex h-full flex-col gap-2 bg-gray-100 p-2">
+	<h2 class="underline">All Events</h2>
 	{#if events.value.length === 0}
 		<div class="empty">No events yet.</div>
 	{:else}
-		<ul>
+		<ul class="flex flex-col gap-2">
 			{#each events.value as ev (ev.id)}
 				<li>
-					<div class="event-info">
-						<span class="event-title">{ev.title}</span>
-						{#if editingEventId === ev.id}
-							<input
-								type="date"
-								bind:value={editingDate}
-								on:blur={() => saveEditDate(ev)}
-								on:keydown={(e) => handleDateInputKey(e, ev)}
-								autofocus
-								class="event-date-input"
-							/>
-						{:else}
-							<span class="event-date" on:click={() => startEditDate(ev)}
-								>{new Date(ev.date).toLocaleDateString()}</span
-							>
-						{/if}
+					<div class="content flex gap-2 rounded-md bg-gray-300 p-2">
+						<div class="event-info w-full">
+							{#if editingTitleId === ev.id}
+								<input
+									type="text"
+									bind:value={editingTitle}
+									on:blur={() => saveEditTitle(ev)}
+									on:keydown={(e) => handleTitleInputKey(e, ev)}
+									autofocus
+									class="event-title-input"
+								/>
+							{:else}
+								<button class="event-title" on:click={() => startEditTitle(ev)}>{ev.title}</button>
+							{/if}
+							{#if editingEventId === ev.id}
+								<input
+									type="date"
+									bind:value={editingDate}
+									on:blur={() => saveEditDate(ev)}
+									on:keydown={(e) => handleDateInputKey(e, ev)}
+									autofocus
+									class="event-date-input"
+								/>
+							{:else}
+								<button class="event-date" on:click={() => startEditDate(ev)}
+									>{new Date(ev.date).toLocaleDateString()}</button
+								>
+							{/if}
+						</div>
+						<button class="delete-btn" on:click={() => deleteEvent(ev.id)}>Delete</button>
 					</div>
-					<button class="delete-btn" on:click={() => deleteEvent(ev.id)}>Delete</button>
 				</li>
 			{/each}
 		</ul>
@@ -73,29 +109,20 @@
 <style>
 	.sidebar {
 		width: 220px;
-		background: #f1f5f9;
-		border-radius: 12px;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-		padding: 1.5rem 1rem;
 		min-height: 200px;
 	}
 	.sidebar h2 {
 		font-size: 1.3rem;
 		font-weight: 700;
-		margin-bottom: 1rem;
 		color: #334155;
 	}
 	.sidebar ul {
 		list-style: none;
-		padding: 0;
-		margin: 0;
 	}
-	.sidebar li {
-		display: flex;
+	.sidebar .content {
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid #e2e8f0;
 	}
 	.sidebar li:last-child {
 		border-bottom: none;
@@ -103,6 +130,10 @@
 	.event-info {
 		display: flex;
 		flex-direction: column;
+		gap: 2px;
+		width: 100%;
+		min-width: 0;
+		height: 60px;
 	}
 	.event-title {
 		font-weight: 600;
@@ -133,11 +164,25 @@
 	}
 	.event-date-input {
 		font-size: 0.95em;
+		color: #334155;
+		margin-top: 2px;
+	}
+	.event-title-input {
+		font-size: 1em;
+		color: #1e293b;
+		margin-bottom: 2px;
+		font-weight: 600;
+	}
+	.event-date-input,
+	.event-title-input {
 		padding: 0.2em 0.4em;
 		border-radius: 4px;
 		border: 1px solid #cbd5e1;
-		color: #334155;
 		background: #fff;
-		margin-top: 2px;
+		width: 100%;
+		max-width: 100%;
+		box-sizing: border-box;
+		word-break: break-word;
+		white-space: pre-wrap;
 	}
 </style>
