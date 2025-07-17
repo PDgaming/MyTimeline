@@ -6,6 +6,8 @@
 	let editingDate: string = '';
 	let editingTitleId: string | null = null;
 	let editingTitle: string = '';
+	let editingDescId: string | null = null;
+	let editingDesc: string = '';
 
 	function deleteEvent(id: string) {
 		events.value = events.value.filter((ev) => ev.id !== id);
@@ -59,6 +61,30 @@
 			editingTitleId = null;
 		}
 	}
+
+	function startEditDesc(ev: event) {
+		editingDescId = ev.id;
+		editingDesc = ev.description || '';
+	}
+
+	function saveEditDesc(ev: event) {
+		// Allow empty description
+		events.value = events.value.map((e) =>
+			e.id === ev.id ? { ...e, description: editingDesc } : e
+		);
+		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+		editingDescId = null;
+	}
+
+	function handleDescInputKey(e: KeyboardEvent, ev: event) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			saveEditDesc(ev);
+		}
+		if (e.key === 'Escape') {
+			editingDescId = null;
+		}
+	}
 </script>
 
 <aside class="sidebar flex h-full flex-col gap-2 bg-gray-100 p-2">
@@ -70,7 +96,7 @@
 			{#each events.value as ev (ev.id)}
 				<li>
 					<div class="content flex gap-2 rounded-md bg-gray-300 p-2">
-						<div class="event-info w-full">
+						<div class="event-info flex w-full flex-col gap-2">
 							{#if editingTitleId === ev.id}
 								<input
 									type="text"
@@ -82,6 +108,20 @@
 								/>
 							{:else}
 								<button class="event-title" on:click={() => startEditTitle(ev)}>{ev.title}</button>
+							{/if}
+							{#if editingDescId === ev.id}
+								<textarea
+									bind:value={editingDesc}
+									on:blur={() => saveEditDesc(ev)}
+									on:keydown={(e) => handleDescInputKey(e, ev)}
+									autofocus
+									class="event-desc-input"
+									rows="2"
+								></textarea>
+							{:else}
+								<button class="event-desc" on:click={() => startEditDesc(ev)}
+									>{ev.description || 'No description'}</button
+								>
 							{/if}
 							{#if editingEventId === ev.id}
 								<input
@@ -128,12 +168,11 @@
 		border-bottom: none;
 	}
 	.event-info {
-		display: flex;
 		flex-direction: column;
-		gap: 2px;
 		width: 100%;
 		min-width: 0;
-		height: 60px;
+		min-height: fit-content;
+		height: 90px;
 	}
 	.event-title {
 		font-weight: 600;
@@ -184,5 +223,34 @@
 		box-sizing: border-box;
 		word-break: break-word;
 		white-space: pre-wrap;
+	}
+	.event-desc {
+		font-size: 0.95em;
+		color: #64748b;
+		background: none;
+		border: none;
+		padding: 0;
+		text-align: left;
+		width: 100%;
+		max-width: 100%;
+		cursor: pointer;
+		margin-bottom: 2px;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+	.event-desc-input {
+		font-size: 0.95em;
+		color: #64748b;
+		background: #fff;
+		border: 1px solid #cbd5e1;
+		border-radius: 4px;
+		width: 100%;
+		max-width: 100%;
+		box-sizing: border-box;
+		resize: vertical;
+		margin-bottom: 2px;
+		padding: 0.2em 0.4em;
+		white-space: pre-wrap;
+		word-break: break-word;
 	}
 </style>
