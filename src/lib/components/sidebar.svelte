@@ -2,9 +2,39 @@
 	import { events } from '$lib/stores/store.svelte';
 	import type { event } from '$lib/types';
 
+	let editingEventId: string | null = null;
+	let editingDate: string = '';
+
 	function deleteEvent(id: string) {
 		events.value = events.value.filter((ev) => ev.id !== id);
 		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+	}
+
+	function startEditDate(ev: event) {
+		editingEventId = ev.id;
+		// Convert ms to yyyy-mm-dd
+		const d = new Date(ev.date);
+		const yyyy = d.getFullYear();
+		const mm = String(d.getMonth() + 1).padStart(2, '0');
+		const dd = String(d.getDate()).padStart(2, '0');
+		editingDate = `${yyyy}-${mm}-${dd}`;
+	}
+
+	function saveEditDate(ev: event) {
+		if (!editingDate) return;
+		const newDate = new Date(editingDate).getTime();
+		events.value = events.value.map((e) => (e.id === ev.id ? { ...e, date: newDate } : e));
+		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+		editingEventId = null;
+	}
+
+	function handleDateInputKey(e: KeyboardEvent, ev: event) {
+		if (e.key === 'Enter') {
+			saveEditDate(ev);
+		}
+		if (e.key === 'Escape') {
+			editingEventId = null;
+		}
 	}
 </script>
 
@@ -18,7 +48,20 @@
 				<li>
 					<div class="event-info">
 						<span class="event-title">{ev.title}</span>
-						<span class="event-date">{new Date(ev.date).toLocaleDateString()}</span>
+						{#if editingEventId === ev.id}
+							<input
+								type="date"
+								bind:value={editingDate}
+								on:blur={() => saveEditDate(ev)}
+								on:keydown={(e) => handleDateInputKey(e, ev)}
+								autofocus
+								class="event-date-input"
+							/>
+						{:else}
+							<span class="event-date" on:click={() => startEditDate(ev)}
+								>{new Date(ev.date).toLocaleDateString()}</span
+							>
+						{/if}
 					</div>
 					<button class="delete-btn" on:click={() => deleteEvent(ev.id)}>Delete</button>
 				</li>
@@ -87,5 +130,14 @@
 		font-style: italic;
 		padding: 1rem 0;
 		text-align: center;
+	}
+	.event-date-input {
+		font-size: 0.95em;
+		padding: 0.2em 0.4em;
+		border-radius: 4px;
+		border: 1px solid #cbd5e1;
+		color: #334155;
+		background: #fff;
+		margin-top: 2px;
 	}
 </style>
