@@ -241,11 +241,27 @@
 			}
 			while (current.getTime() <= visibleEnd.value) {
 				const time = current.getTime();
+
+				// Add a day marker at midnight (00:00)
+				if (current.getHours() === 0) {
+					const dayLabel = current.toLocaleDateString([], { month: 'short', day: 'numeric' });
+					newMarkers.push({
+						time,
+						type: 'large',
+						label: dayLabel,
+						position: 'top'
+					});
+				}
+
+				// Show both time and date for large markers (every 6 hours)
 				if (current.getHours() % 6 === 0) {
-					const label = current.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+					const timeLabel = current.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+					const dateLabel = current.toLocaleDateString([], { month: 'short', day: 'numeric' });
+					const label = `${timeLabel} (${dateLabel})`;
 					newMarkers.push({ time, type: 'large', label, position: 'top' });
 				} else {
-					newMarkers.push({ time, type: 'small', label: '', position: 'bottom' });
+					const label = current.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+					newMarkers.push({ time, type: 'small', label, position: 'bottom' });
 				}
 				current.setHours(current.getHours() + 1);
 			}

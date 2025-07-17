@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { events } from '$lib/stores/store.svelte';
 	import type { event } from '$lib/types';
+	import { encryptWithPassword, decryptWithPassword } from '$lib/crypto';
 
 	let editingEventId: string | null = null;
 	let editingDate: string = '';
@@ -8,28 +9,11 @@
 	let editingTitle: string = '';
 	let editingDescId: string | null = null;
 	let editingDesc: string = '';
+	let exporting = false;
 
 	function deleteEvent(id: string) {
 		events.value = events.value.filter((ev) => ev.id !== id);
 		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
-	}
-
-	function startEditDate(ev: event) {
-		editingEventId = ev.id;
-		// Convert ms to yyyy-mm-dd
-		const d = new Date(ev.date);
-		const yyyy = d.getFullYear();
-		const mm = String(d.getMonth() + 1).padStart(2, '0');
-		const dd = String(d.getDate()).padStart(2, '0');
-		editingDate = `${yyyy}-${mm}-${dd}`;
-	}
-
-	function saveEditDate(ev: event) {
-		if (!editingDate) return;
-		const newDate = new Date(editingDate).getTime();
-		events.value = events.value.map((e) => (e.id === ev.id ? { ...e, date: newDate } : e));
-		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
-		editingEventId = null;
 	}
 
 	function handleDateInputKey(e: KeyboardEvent, ev: event) {
@@ -41,16 +25,43 @@
 		}
 	}
 
+	function startEditDate(ev: event) {
+		editingEventId = ev.id;
+		// Convert ms to yyyy-mm-dd
+		const d = new Date(ev.date);
+		const yyyy = d.getFullYear();
+		const mm = String(d.getMonth() + 1).padStart(2, '0');
+		const dd = String(d.getDate()).padStart(2, '0');
+		editingDate = `${yyyy}-${mm}-${dd}`;
+	}
+	function saveEditDate(ev: event) {
+		if (!editingDate) return;
+		const newDate = new Date(editingDate).getTime();
+		events.value = events.value.map((e) => (e.id === ev.id ? { ...e, date: newDate } : e));
+		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+		editingEventId = null;
+	}
 	function startEditTitle(ev: event) {
 		editingTitleId = ev.id;
 		editingTitle = ev.title;
 	}
-
 	function saveEditTitle(ev: event) {
 		if (!editingTitle) return;
 		events.value = events.value.map((e) => (e.id === ev.id ? { ...e, title: editingTitle } : e));
 		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
 		editingTitleId = null;
+	}
+	function startEditDesc(ev: event) {
+		editingDescId = ev.id;
+		editingDesc = ev.description || '';
+	}
+	function saveEditDesc(ev: event) {
+		// Allow empty description
+		events.value = events.value.map((e) =>
+			e.id === ev.id ? { ...e, description: editingDesc } : e
+		);
+		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+		editingDescId = null;
 	}
 
 	function handleTitleInputKey(e: KeyboardEvent, ev: event) {
@@ -61,21 +72,6 @@
 			editingTitleId = null;
 		}
 	}
-
-	function startEditDesc(ev: event) {
-		editingDescId = ev.id;
-		editingDesc = ev.description || '';
-	}
-
-	function saveEditDesc(ev: event) {
-		// Allow empty description
-		events.value = events.value.map((e) =>
-			e.id === ev.id ? { ...e, description: editingDesc } : e
-		);
-		localStorage.setItem('timelineEvents', JSON.stringify(events.value));
-		editingDescId = null;
-	}
-
 	function handleDescInputKey(e: KeyboardEvent, ev: event) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
@@ -85,10 +81,84 @@
 			editingDescId = null;
 		}
 	}
+
+	async function exportEvents() {
+		exporting = true;
+		try {
+			const password = prompt('Enter a password to encrypt your export:');
+			if (!password) {
+				exporting = false;
+				return;
+			}
+			const json = JSON.stringify(events.value);
+			const encrypted = await encryptWithPassword(json, password);
+			const blob = new Blob([encrypted], { type: 'application/octet-stream' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'timeline-events.enc.json';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		} finally {
+			exporting = false;
+		}
+	}
+
+	async function importEvents() {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json,.enc,.txt,application/octet-stream';
+		input.onchange = async () => {
+			const file = input.files?.[0];
+			if (!file) return;
+			const password = prompt('Enter the password to decrypt your events:');
+			if (!password) return;
+			try {
+				const text = await file.text();
+				const decrypted = await decryptWithPassword(text, password);
+				const importedEvents = JSON.parse(decrypted);
+				if (!Array.isArray(importedEvents)) throw new Error('Invalid events data');
+				// Merge: add only events with unique IDs
+				const existingIds = new Set(events.value.map((ev) => ev.id));
+				const newEvents = importedEvents.filter((ev: any) => ev.id && !existingIds.has(ev.id));
+				if (newEvents.length === 0) {
+					alert('No new events to import.');
+					return;
+				}
+				events.value = [...events.value, ...newEvents];
+				localStorage.setItem('timelineEvents', JSON.stringify(events.value));
+				alert(`Imported ${newEvents.length} new event(s).`);
+			} catch (e) {
+				alert('Failed to import events: ' + (e instanceof Error ? e.message : e));
+			}
+		};
+		document.body.appendChild(input);
+		input.click();
+		document.body.removeChild(input);
+	}
 </script>
 
 <aside class="sidebar flex h-full flex-col gap-2 bg-gray-100 p-2">
 	<h2 class="underline">All Events</h2>
+	<div class="mb-1 flex items-center justify-between gap-2">
+		<button
+			class="export-btn btn rounded-md p-2"
+			on:click={exportEvents}
+			disabled={exporting}
+			title="Export all events"
+		>
+			{exporting ? 'Exporting...' : 'Export Events'}
+		</button>
+		<button
+			class="import-btn btn rounded-md p-2"
+			on:click={importEvents}
+			title="Import events from file"
+		>
+			Import Events
+		</button>
+	</div>
 	{#if events.value.length === 0}
 		<div class="empty">No events yet.</div>
 	{:else}
@@ -148,7 +218,7 @@
 
 <style>
 	.sidebar {
-		width: 230px;
+		width: 250px;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 		min-height: 200px;
 	}
@@ -252,5 +322,29 @@
 		padding: 0.2em 0.4em;
 		white-space: pre-wrap;
 		word-break: break-word;
+	}
+	.export-btn {
+		background: #3b82f6;
+		color: white;
+		border: none;
+		font-size: 0.9em;
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+	.export-btn:disabled {
+		background: #93c5fd;
+		cursor: not-allowed;
+	}
+	.import-btn {
+		background: #10b981;
+		color: white;
+		border: none;
+		font-size: 0.9em;
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+	.import-btn:disabled {
+		background: #6ee7b7;
+		cursor: not-allowed;
 	}
 </style>
