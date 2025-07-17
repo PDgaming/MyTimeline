@@ -92,7 +92,7 @@
 	{#if events.value.length === 0}
 		<div class="empty">No events yet.</div>
 	{:else}
-		<ul class="flex flex-col gap-2">
+		<ul class="flex flex-col gap-2 overflow-y-scroll">
 			{#each events.value as ev (ev.id)}
 				<li>
 					<div class="content flex gap-2 rounded-md bg-gray-300 p-2">
@@ -148,7 +148,7 @@
 
 <style>
 	.sidebar {
-		width: 220px;
+		width: 230px;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 		min-height: 200px;
 	}

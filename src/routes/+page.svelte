@@ -303,7 +303,7 @@
 	}
 </script>
 
-<div class="flex h-screen flex-col gap-3 bg-gray-100 font-sans">
+<div class="flex h-full flex-col gap-3 bg-gray-100 font-sans">
 	<div class="title">
 		<h1 class="w-full text-center text-4xl font-bold text-gray-800">MyTimeline</h1>
 	</div>
@@ -533,7 +533,7 @@
 	}
 	.main-content {
 		align-items: flex-start;
-		height: 100%;
+		height: calc(100vh - 130px);
 	}
 	.timeline {
 		height: 100%;

@@ -1,6 +1,6 @@
 import type { event } from "$lib/types";
 
-const timelineMin = new Date(1900, 0, 1).getTime();
+const timelineMin = new Date(1850, 0, 1).getTime();
 const timelineMax = new Date(3000, 0, 1).getTime();
 const visibleStart = $state({ value: 0 });
 const visibleEnd = $state({ value: 0 });
